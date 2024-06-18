@@ -4,7 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 
 export const verifyJWT = asyncHandler(async (req, _, next) => {
-  // request ke ass cookies ka access hai given during login
+  // request ke cookies ka access hai given during login
   try {
     const token =
       req.cookies?.accessToken ||
