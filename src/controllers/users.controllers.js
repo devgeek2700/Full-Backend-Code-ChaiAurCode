@@ -354,6 +354,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   if (!username?.trim()) {
     throw new ApiError(400, "Username is required!");
   }
+Aggregation
 
   const channel = await User.aggregate([
     {
