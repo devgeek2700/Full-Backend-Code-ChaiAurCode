@@ -1,0 +1,25 @@
+[
+    {
+        $lookp:{
+            from: "authors",
+            localFiels: "author_id",
+            foreignField: "_id",
+            as: "author_details"
+        }
+    },
+    {
+        Mtd-1
+        $addFields: {
+            author_details: {
+                $first : "$author_details",
+            }
+        }
+
+        // Mtd-2
+        $addFields: {
+            author_details: {
+                $ArrayElemAt : ["$author_details", 0],
+            }
+        }
+    }
+]
