@@ -4,16 +4,14 @@ import { User } from "../models/user.model.js";
 import { uploadFileOnCloudinary } from "../utils/fileUpload.js";
 import { ApiReponse } from "../utils/ApiReponse.js";
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken"; // Add this import
 
 const generateAccessandRefreshTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
-    // accesss tokens are given to user
     const accessToken = user.generateAccessToken();
-
-    // refresh tokens are given to db
     const refreshToken = user.generateRefreshToken();
-    // we are saving the endecoded token (user.refreshToken) from auth to this refreshToken
+
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
 
@@ -21,7 +19,7 @@ const generateAccessandRefreshTokens = async (userId) => {
   } catch (error) {
     throw new ApiError(
       500,
-      "Something went wrong while generating access  and refresh tokens!"
+      "Something went wrong while generating access and refresh tokens!"
     );
   }
 };
@@ -102,15 +100,7 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-  // re body --> data
-  // username or email
-  // find the user
-  // password checkb
-  // access and redresh token generate
-  // send token in cookies
-
   const { email, username, password } = req.body;
-  // console.log("Email: ", email);
 
   if (!username && !email) {
     throw new ApiError(400, "Username or email is required");
@@ -123,6 +113,7 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!user) {
     throw new ApiError(404, "Don't have Account!");
   }
+
   const isPasswordValid = await user.isPasswordCorrect(password);
 
   if (!isPasswordValid) {
@@ -133,8 +124,8 @@ const loginUser = asyncHandler(async (req, res) => {
     user._id
   );
 
-  console.log("accessToken: ", accessToken);
-  console.log("refreshToken: ", refreshToken);
+  console.log("Generated Access Token:", accessToken); // Debug
+  console.log("Generated Refresh Token:", refreshToken); // Debug
 
   const loggedInUser = await User.findById(user._id).select(
     "-password -refreshToken"
@@ -142,7 +133,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
   };
 
   return res
@@ -177,7 +169,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
   };
 
   return res
@@ -203,31 +196,32 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     const user = await User.findById(decodedToken?._id);
     if (!user) {
-      throw new ApiError(404, "Invalide refresh token!");
+      throw new ApiError(404, "Invalid refresh token!");
     }
 
     if (user?.refreshToken !== incomingrefreshToken) {
       throw new ApiError(404, "Refresh token is expired or used!");
     }
 
-    const { accessToken, newrefreshToken } =
+    const { accessToken, refreshToken: newRefreshToken } =
       await generateAccessandRefreshTokens(user._id);
 
     const options = {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
     };
 
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
-      .cookie("refreshToken", newrefreshToken, options)
+      .cookie("refreshToken", newRefreshToken, options)
       .json(
         new ApiReponse(
           200,
           {
             accessToken,
-            refreshToken: newrefreshToken,
+            refreshToken: newRefreshToken,
           },
           "Access Token Refreshed!"
         )
@@ -260,11 +254,15 @@ const changeCurrentUserPassword = asyncHandler(async (req, res) => {
 });
 
 const getcCurrentUser = asyncHandler(async (req, res) => {
-  const currentUser = await User.findById(req.user?._id);
+  const currentUser = await User.findById(req.user?._id).select("-password");
+
+  if (!currentUser) {
+    return res.status(404).json({ message: "User not found" });
+  }
 
   return res
     .status(200)
-    .json(200, currentUser, "Current User Fetched Successfully!");
+    .json({ message: "Current User Fetched Successfully!", data: currentUser });
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
@@ -288,7 +286,9 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiReponse(200, {}, "Current User Fetched Successfully!"));
+    .json(
+      new ApiReponse(200, {}, "Current User Fetched/Updated Successfully!")
+    );
 });
 
 const updateAvatar = asyncHandler(async (req, res) => {
@@ -355,7 +355,6 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
   if (!username?.trim()) {
     throw new ApiError(400, "Username is required!");
   }
-  Aggregation;
 
   const channel = await User.aggregate([
     {
